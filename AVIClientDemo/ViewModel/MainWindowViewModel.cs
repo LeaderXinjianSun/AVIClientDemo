@@ -184,7 +184,7 @@ namespace AVIClientDemo.ViewModel
         #endregion
         #region 变量
         private string iniParameterPath = System.Environment.CurrentDirectory + "\\Parameter.ini";
-        CameraOperate mycam = new CameraOperate();
+        CameraOperate mycam = new CameraOperate();string cameraName = "", cameraInterface = "";
         #endregion
         #region 构造函数
         public MainWindowViewModel()
@@ -200,6 +200,8 @@ namespace AVIClientDemo.ViewModel
                 MachineID = Inifile.INIGetStringValue(iniParameterPath, "System", "MachineID", "Null");
                 StationNo = 0;
                 StationNo = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "System", "StationNo", "1"));
+                cameraName = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
+                cameraInterface = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
                 Version += StationNo.ToString();
                 EStopIsChecked = false;
                 CameraROIList = new ObservableCollection<ROI>();
@@ -290,8 +292,9 @@ namespace AVIClientDemo.ViewModel
                     }
                     break;
                 case "1":
-                    //Inifile.INIWriteValue(iniParameterPath, "System", "StationNo", "1");
-                    AddMessage("待添加内容");
+                    Inifile.INIWriteValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
+                    Inifile.INIWriteValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
+                    //AddMessage("待添加内容");
                     break;
                 case "2":
                     break;
@@ -368,7 +371,7 @@ namespace AVIClientDemo.ViewModel
                 StatusDataBase = false;
             }
             #region 初始化相机
-            if (mycam.OpenCamera("[0] Integrated Camera", "DirectShow"))
+            if (mycam.OpenCamera(cameraName, cameraInterface))
             {
                 AddMessage("相机打开成功");
             }
@@ -425,7 +428,7 @@ namespace AVIClientDemo.ViewModel
                                         {
                                             AddMessage("拍照成功");
                                             CameraIamge = mycam.CurrentImage;
-                                            if (mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{guid}_{MachineID}.bmp")))
+                                            if (await Task.Run<bool>(()=> { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{guid}_{MachineID}.bmp")); }))
                                             {
                                                 AddMessage("图片保存成功");
                                                 stm = $"UPDATE avilinestate SET M1State = 2";
@@ -434,6 +437,10 @@ namespace AVIClientDemo.ViewModel
                                                 {
                                                     AddMessage("1号机放板");
                                                 }
+                                            }
+                                            else
+                                            {
+                                                AddMessage("图片保存失败");
                                             }
                                         }
                                     }
@@ -469,7 +476,8 @@ namespace AVIClientDemo.ViewModel
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
                                                 string[] vs = ((string)dt.Rows[0]["M1BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                if (mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")))
+                                                
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
                                                     stm = $"UPDATE avilinestate SET M2State = 2,M1State = 0,M1BoardID = NULL";
@@ -478,6 +486,10 @@ namespace AVIClientDemo.ViewModel
                                                     {
                                                         AddMessage("2号机放板");
                                                     }
+                                                }
+                                                else
+                                                {
+                                                    AddMessage("图片保存失败");
                                                 }
                                             }
                                         }
@@ -515,7 +527,7 @@ namespace AVIClientDemo.ViewModel
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
                                                 string[] vs = ((string)dt.Rows[0]["M2BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                if (mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")))
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
                                                     stm = $"UPDATE avilinestate SET M3State = 2,M2State = 0,M2BoardID = NULL";
@@ -524,6 +536,10 @@ namespace AVIClientDemo.ViewModel
                                                     {
                                                         AddMessage("3号机放板");
                                                     }
+                                                }
+                                                else
+                                                {
+                                                    AddMessage("图片保存失败");
                                                 }
                                             }
                                         }
@@ -561,7 +577,7 @@ namespace AVIClientDemo.ViewModel
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
                                                 string[] vs = ((string)dt.Rows[0]["M3BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                if (mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")))
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
                                                     stm = $"UPDATE avilinestate SET M4State = 0,M3State = 0,M3BoardID = NULL";
@@ -570,6 +586,10 @@ namespace AVIClientDemo.ViewModel
                                                     {
                                                         AddMessage("4号机放板");
                                                     }
+                                                }
+                                                else
+                                                {
+                                                    AddMessage("图片保存失败");
                                                 }
                                             }
                                         }
