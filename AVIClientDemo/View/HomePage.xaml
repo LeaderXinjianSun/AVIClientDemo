@@ -35,7 +35,7 @@
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
                     </Grid.ColumnDefinitions>
-                    <ToggleButton Content="急停" IsChecked="{Binding EStopIsChecked}" Command="{Binding OperateButtonCommand}" FontSize="22" CommandParameter="0"
+                    <ToggleButton Content="急停" Visibility="{Binding EStopToggleButtonVisibility}" IsChecked="{Binding EStopIsChecked}" Command="{Binding OperateButtonCommand}" FontSize="22" CommandParameter="0"
                               Margin="10"
                               Style="{DynamicResource MahApps.Styles.ToggleButton.Flat}">
                     </ToggleButton>

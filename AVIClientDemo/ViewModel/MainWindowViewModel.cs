@@ -173,6 +173,17 @@ namespace AVIClientDemo.ViewModel
             }
         }
 
+        private string eStopToggleButtonVisibility;
+
+        public string EStopToggleButtonVisibility
+        {
+            get { return eStopToggleButtonVisibility; }
+            set
+            {
+                eStopToggleButtonVisibility = value;
+                this.RaisePropertyChanged("EStopToggleButtonVisibility");
+            }
+        }
 
         #endregion
         #region 方法绑定
@@ -193,13 +204,17 @@ namespace AVIClientDemo.ViewModel
             try
             {
                 MessageStr = "";
-                Version = "20201014 ";
+                Version = "20201022";
                 HomePageVisibility = "Visible";
                 ParameterPageVisibility = "Collapsed";
                 RemotePath = Inifile.INIGetStringValue(iniParameterPath, "System", "RemotePath", "D:\\");
                 MachineID = Inifile.INIGetStringValue(iniParameterPath, "System", "MachineID", "Null");
                 StationNo = 0;
                 StationNo = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "System", "StationNo", "1"));
+                if (StationNo == 1)
+                    EStopToggleButtonVisibility = "Visible";
+                else
+                    EStopToggleButtonVisibility = "Collapsed";
                 cameraName = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
                 cameraInterface = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
                 Version += StationNo.ToString();
@@ -292,9 +307,18 @@ namespace AVIClientDemo.ViewModel
                     }
                     break;
                 case "1":
-                    Inifile.INIWriteValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
-                    Inifile.INIWriteValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
+                    //Inifile.INIWriteValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
+                    //Inifile.INIWriteValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
                     //AddMessage("待添加内容");
+                    if (mycam.GrabImage(0, false))
+                    {
+                        AddMessage("拍照成功");
+                        CameraIamge = mycam.CurrentImage;
+                    }
+                    else
+                    {
+                        AddMessage("拍照失败");
+                    }
                     break;
                 case "2":
                     break;
@@ -349,13 +373,7 @@ namespace AVIClientDemo.ViewModel
                 {
                     string stm = $"SELECT NOW()";
                     DataSet ds = mysql.Select(stm);
-                    
-                    stm = $"UPDATE avilinestate SET M1State = 0,M1BoardID = NULL,M2State = 0,M2BoardID = NULL,M3State = 0,M3BoardID = NULL,M4State = 0,M4BoardID = NULL";
-                    int result = mysql.executeQuery(stm);
-                    if (result > 0)
-                    {
-                        AddMessage($"数据库连接成功{ ds.Tables["table0"].Rows[0][0]}");
-                    }
+                    AddMessage($"数据库连接成功{ ds.Tables["table0"].Rows[0][0]}");
                     StatusDataBase = true;
                 }
                 else
@@ -419,7 +437,7 @@ namespace AVIClientDemo.ViewModel
                                 if ((int)dt.Rows[0]["M1State"] == 0)//0：等待拍照 1：拍照中 2：放板
                                 {
                                     var guid = Guid.NewGuid();
-                                    stm = $"UPDATE avilinestate SET M1State = 1,M1BoardID = '{guid}_{MachineID}'";
+                                    stm = $"UPDATE avilinestate SET M1State = 1,M1BoardID = '{guid}'";
                                     result = mysql.executeQuery(stm);
                                     if (result > 0)
                                     {
@@ -475,12 +493,17 @@ namespace AVIClientDemo.ViewModel
                                             {
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
-                                                string[] vs = ((string)dt.Rows[0]["M1BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
+                                                string boardID = (string)dt.Rows[0]["M1BoardID"];                                                                                               
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
-                                                    stm = $"UPDATE avilinestate SET M2State = 2,M1State = 0,M1BoardID = NULL";
+                                                    stm = $"SELECT * FROM avilinestate LIMIT 1";
+                                                    ds = mysql.Select(stm);
+                                                    dt = ds.Tables["table0"];
+                                                    if ((int)dt.Rows[0]["M1State"] != -1)
+                                                        stm = $"UPDATE avilinestate SET M2State = 2,M1State = 0,M1BoardID = NULL";
+                                                    else
+                                                        stm = $"UPDATE avilinestate SET M2State = 2,M1BoardID = NULL";
                                                     result = mysql.executeQuery(stm);
                                                     if (result > 0)
                                                     {
@@ -526,8 +549,8 @@ namespace AVIClientDemo.ViewModel
                                             {
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
-                                                string[] vs = ((string)dt.Rows[0]["M2BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
+                                                string boardID = (string)dt.Rows[0]["M2BoardID"];
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
                                                     stm = $"UPDATE avilinestate SET M3State = 2,M2State = 0,M2BoardID = NULL";
@@ -576,8 +599,8 @@ namespace AVIClientDemo.ViewModel
                                             {
                                                 AddMessage("拍照成功");
                                                 CameraIamge = mycam.CurrentImage;
-                                                string[] vs = ((string)dt.Rows[0]["M3BoardID"]).Split(new string[] { "_" }, StringSplitOptions.RemoveEmptyEntries);
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{vs[0]}_{MachineID}.bmp")); }))
+                                                string boardID = (string)dt.Rows[0]["M3BoardID"];
+                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
                                                 {
                                                     AddMessage("图片保存成功");
                                                     stm = $"UPDATE avilinestate SET M4State = 0,M3State = 0,M3BoardID = NULL";
