@@ -172,16 +172,59 @@ namespace AVIClientDemo.ViewModel
                 this.RaisePropertyChanged("CameraGCStyle");
             }
         }
+        private bool statusPLC;
 
-        private string eStopToggleButtonVisibility;
-
-        public string EStopToggleButtonVisibility
+        public bool StatusPLC
         {
-            get { return eStopToggleButtonVisibility; }
+            get { return statusPLC; }
             set
             {
-                eStopToggleButtonVisibility = value;
-                this.RaisePropertyChanged("EStopToggleButtonVisibility");
+                statusPLC = value;
+                this.RaisePropertyChanged("StatusPLC");
+            }
+        }
+        private string curBoardID;
+
+        public string CurBoardID
+        {
+            get { return curBoardID; }
+            set
+            {
+                curBoardID = value;
+                this.RaisePropertyChanged("CurBoardID");
+            }
+        }
+        private string remoteIP;
+
+        public string RemoteIP
+        {
+            get { return remoteIP; }
+            set
+            {
+                remoteIP = value;
+                this.RaisePropertyChanged("RemoteIP");
+            }
+        }
+        private int remotePort;
+
+        public int RemotePort
+        {
+            get { return remotePort; }
+            set
+            {
+                remotePort = value;
+                this.RaisePropertyChanged("RemotePort");
+            }
+        }
+        private bool statusTCP;
+
+        public bool StatusTCP
+        {
+            get { return statusTCP; }
+            set
+            {
+                statusTCP = value;
+                this.RaisePropertyChanged("StatusTCP");
             }
         }
 
@@ -196,6 +239,8 @@ namespace AVIClientDemo.ViewModel
         #region 变量
         private string iniParameterPath = System.Environment.CurrentDirectory + "\\Parameter.ini";
         CameraOperate mycam = new CameraOperate();string cameraName = "", cameraInterface = "";
+        InovanceH3UModbusTCP H3u;
+        DXH.Net.DXHTCPClient tcpNet;
         #endregion
         #region 构造函数
         public MainWindowViewModel()
@@ -211,15 +256,20 @@ namespace AVIClientDemo.ViewModel
                 MachineID = Inifile.INIGetStringValue(iniParameterPath, "System", "MachineID", "Null");
                 StationNo = 0;
                 StationNo = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "System", "StationNo", "1"));
-                if (StationNo == 1)
-                    EStopToggleButtonVisibility = "Visible";
-                else
-                    EStopToggleButtonVisibility = "Collapsed";
+
                 cameraName = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraName", "[0] Integrated Camera");
                 cameraInterface = Inifile.INIGetStringValue(iniParameterPath, "System", "CameraInterface", "DirectShow");
                 Version += StationNo.ToString();
                 EStopIsChecked = false;
                 CameraROIList = new ObservableCollection<ROI>();
+
+                string ip = Inifile.INIGetStringValue(iniParameterPath, "PLC", "IP", "192.168.0.100");
+                H3u = new InovanceH3UModbusTCP(ip);
+
+                RemoteIP = Inifile.INIGetStringValue(iniParameterPath, "Remote", "IP", "192.168.0.11");
+                RemotePort = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "Remote", "PORT", "3000"));
+                tcpNet = new DXH.Net.DXHTCPClient(RemoteIP,RemotePort);
+                tcpNet.ConnectStateChanged += TcpNet_ConnectStateChanged;
             }
             catch (Exception ex)
             {
@@ -233,6 +283,11 @@ namespace AVIClientDemo.ViewModel
             FolderBrowserDialogCommand = new DelegateCommand(new Action(this.FolderBrowserDialogCommandExecute));
             ParameterSaveCommand = new DelegateCommand(new Action(this.ParameterSaveCommandExecute));
             OperateButtonCommand = new DelegateCommand<object>(new Action<object>(this.OperateButtonCommandExecute));
+        }
+
+        private void TcpNet_ConnectStateChanged(object sender, string e)
+        {
+            StatusTCP = e == "Connected";
         }
 
         private void OperateButtonCommandExecute(object obj)
@@ -331,6 +386,8 @@ namespace AVIClientDemo.ViewModel
         {
             Inifile.INIWriteValue(iniParameterPath, "System", "RemotePath", RemotePath);
             Inifile.INIWriteValue(iniParameterPath, "System", "MachineID", MachineID);
+            Inifile.INIWriteValue(iniParameterPath, "Remote", "IP", RemoteIP);
+            Inifile.INIWriteValue(iniParameterPath, "Remote", "PORT", RemotePort.ToString());
             AddMessage("保存参数");
         }
 
@@ -398,6 +455,7 @@ namespace AVIClientDemo.ViewModel
                 AddMessage("相机打开失败");
             }
             #endregion
+            tcpNet.StartTCPConnect();
             Run();
         }
         #endregion
@@ -423,221 +481,265 @@ namespace AVIClientDemo.ViewModel
             {
                 try
                 {
+
                     switch (StationNo)
                     {
                         case 1:
                             #region 1号机内容
-                            await Task.Delay(800);
-                            mysql = new Mysql();
-                            if (await Task.Run<bool>(() => { return mysql.Connect(); }))
+
+
+                            if (H3u.ReadM("M2000"))
                             {
-                                string stm = $"SELECT * FROM avilinestate LIMIT 1";
-                                DataSet ds = mysql.Select(stm);
-                                DataTable dt = ds.Tables["table0"];
-                                if ((int)dt.Rows[0]["M1State"] == 0)//0：等待拍照 1：拍照中 2：放板
+                                AddMessage("进料位-等待进板");
+                                H3u.SetM("M2000", false);
+                                short[] newBoard = new short[70];
+                                for (int i = 0; i < 70; i++)
+                                {
+                                    Random rd = new Random();
+                                    if (rd.Next(100) < 95)
+                                    {
+                                        newBoard[i] = 1;
+                                    }
+                                    else
+                                    {
+                                        newBoard[i] = 0;
+                                    }
+                                }
+                                H3u.WriteMultD("D4000", newBoard);
+                                await Task.Delay(500);
+                                H3u.SetM("M2100", true);
+                                AddMessage("进料位-进板完成");
+                            }
+
+                            if (H3u.ReadM("M2011"))
+                            {
+                                AddMessage("工位1-进板完成");
+                                H3u.SetM("M2011", false);
+                                mysql = new Mysql();
+                                if (await Task.Run<bool>(() => { return mysql.Connect(); }))
                                 {
                                     var guid = Guid.NewGuid();
-                                    stm = $"UPDATE avilinestate SET M1State = 1,M1BoardID = '{guid}'";
+                                    CurBoardID = guid.ToString();
+                                    string stm = $"UPDATE avilinestate SET M1BoardID = '{guid}'";
                                     result = mysql.executeQuery(stm);
                                     if (result > 0)
                                     {
                                         AddMessage($"板编号 {guid}_{MachineID} 更新成功");
-                                        if (mycam.GrabImage(0, false))
-                                        {
-                                            AddMessage("拍照成功");
-                                            CameraIamge = mycam.CurrentImage;
-                                            if (await Task.Run<bool>(()=> { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{guid}_{MachineID}.bmp")); }))
-                                            {
-                                                AddMessage("图片保存成功");
-                                                stm = $"UPDATE avilinestate SET M1State = 2";
-                                                result = mysql.executeQuery(stm);
-                                                if (result > 0)
-                                                {
-                                                    AddMessage("1号机放板");
-                                                }
-                                            }
-                                            else
-                                            {
-                                                AddMessage("图片保存失败");
-                                            }
-                                        }
                                     }
                                 }
+                                else
+                                {
+                                    AddMessage("数据库未连接");
+                                    StatusDataBase = false;
+                                }
+                                mysql.DisConnect();
                             }
-                            else
+
+
+
+                            if (H3u.ReadM("M2010"))
                             {
-                                AddMessage("数据库未连接");
-                                StatusDataBase = false;
+                                int d2010 = H3u.ReadW("D2010");
+                                AddMessage($"工位1-{d2010}-开始拍照");
+                                H3u.SetM("M2010", false);
+                                if (mycam.GrabImage(0, false))
+                                {
+                                    AddMessage("拍照成功");
+                                    CameraIamge = mycam.CurrentImage;
+                                    if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{CurBoardID}_{MachineID}_{d2010}.bmp")); }))
+                                    {
+                                        AddMessage("图片保存成功");
+                                        tcpNet.TCPSend($"{CurBoardID}_{MachineID}_{d2010}.bmp");
+                                    }
+                                    else
+                                    {
+                                        AddMessage("图片保存失败");
+                                    }
+                                }
+
                             }
-                            mysql.DisConnect();
+                            
                             #endregion
                             break;
+
                         case 2:
                             #region 2号机内容
-                            mysql = new Mysql();
-                            if (await Task.Run<bool>(() => { return mysql.Connect(); }))
+                            if (H3u.ReadM("M2021"))
                             {
-                                string stm = $"SELECT * FROM avilinestate LIMIT 1";
-                                DataSet ds = mysql.Select(stm);
-                                DataTable dt = ds.Tables["table0"];
-                                if ((int)dt.Rows[0]["M1State"] != -1)//0：等待拍照 1：拍照中 2：放板 -1：急停
+                                AddMessage("工位2-进板完成");
+                                H3u.SetM("M2021", false);
+                                mysql = new Mysql();
+                                if (await Task.Run<bool>(() => { return mysql.Connect(); }))
                                 {
-                                    if ((int)dt.Rows[0]["M1State"] == 2 && (int)dt.Rows[0]["M2State"] == 0)//1号机放板，2号机等待拍照
+                                    string stm = $"SELECT * FROM avilinestate LIMIT 1";
+                                    DataSet ds = mysql.Select(stm);
+                                    DataTable dt = ds.Tables["table0"];
+
+                                    CurBoardID = (string)dt.Rows[0]["M1BoardID"];
+
+                                    stm = $"UPDATE avilinestate SET M2BoardID = '{CurBoardID}'";
+                                    result = mysql.executeQuery(stm);
+                                    if (result > 0)
                                     {
-                                        stm = $"UPDATE avilinestate SET M2State = 1,M2BoardID = M1BoardID";
-                                        result = mysql.executeQuery(stm);
-                                        if (result > 0)
-                                        {
-                                            AddMessage("2号机拍照");
-                                            if (mycam.GrabImage(0, false))
-                                            {
-                                                AddMessage("拍照成功");
-                                                CameraIamge = mycam.CurrentImage;
-                                                string boardID = (string)dt.Rows[0]["M1BoardID"];                                                                                               
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
-                                                {
-                                                    AddMessage("图片保存成功");
-                                                    stm = $"SELECT * FROM avilinestate LIMIT 1";
-                                                    ds = mysql.Select(stm);
-                                                    dt = ds.Tables["table0"];
-                                                    if ((int)dt.Rows[0]["M1State"] != -1)
-                                                        stm = $"UPDATE avilinestate SET M2State = 2,M1State = 0,M1BoardID = NULL";
-                                                    else
-                                                        stm = $"UPDATE avilinestate SET M2State = 2,M1BoardID = NULL";
-                                                    result = mysql.executeQuery(stm);
-                                                    if (result > 0)
-                                                    {
-                                                        AddMessage("2号机放板");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    AddMessage("图片保存失败");
-                                                }
-                                            }
-                                        }
+                                        AddMessage($"板编号 {CurBoardID}_{MachineID} 更新成功");
                                     }
-                                    
                                 }
+                                else
+                                {
+                                    AddMessage("数据库未连接");
+                                    StatusDataBase = false;
+                                }
+                                mysql.DisConnect();
                             }
-                            else
+
+
+
+                            if (H3u.ReadM("M2020"))
                             {
-                                AddMessage("数据库未连接");
-                                StatusDataBase = false;
+                                int d2020 = H3u.ReadW("D2020");
+                                AddMessage($"工位2-{d2020}-开始拍照");
+                                H3u.SetM("M2020", false);
+                                if (mycam.GrabImage(0, false))
+                                {
+                                    AddMessage("拍照成功");
+                                    CameraIamge = mycam.CurrentImage;
+                                    if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{CurBoardID}_{MachineID}_{d2020}.bmp")); }))
+                                    {
+                                        AddMessage("图片保存成功");
+                                        tcpNet.TCPSend($"{CurBoardID}_{MachineID}_{d2020}.bmp");
+                                    }
+                                    else
+                                    {
+                                        AddMessage("图片保存失败");
+                                    }
+                                }
+
                             }
-                            mysql.DisConnect();
                             #endregion
                             break;
                         case 3:
                             #region 3号机内容
-                            mysql = new Mysql();
-                            if (await Task.Run<bool>(() => { return mysql.Connect(); }))
+                            if (H3u.ReadM("M2031"))
                             {
-                                string stm = $"SELECT * FROM avilinestate LIMIT 1";
-                                DataSet ds = mysql.Select(stm);
-                                DataTable dt = ds.Tables["table0"];
-                                if ((int)dt.Rows[0]["M1State"] != -1)//0：等待拍照 1：拍照中 2：放板 -1：急停
+                                AddMessage("工位3-进板完成");
+                                H3u.SetM("M2031", false);
+                                mysql = new Mysql();
+                                if (await Task.Run<bool>(() => { return mysql.Connect(); }))
                                 {
-                                    if ((int)dt.Rows[0]["M2State"] == 2 && (int)dt.Rows[0]["M3State"] == 0)//1号机放板，2号机等待拍照
-                                    {
-                                        stm = $"UPDATE avilinestate SET M3State = 1,M3BoardID = M2BoardID";
-                                        result = mysql.executeQuery(stm);
-                                        if (result > 0)
-                                        {
-                                            AddMessage("3号机拍照");
-                                            if (mycam.GrabImage(0, false))
-                                            {
-                                                AddMessage("拍照成功");
-                                                CameraIamge = mycam.CurrentImage;
-                                                string boardID = (string)dt.Rows[0]["M2BoardID"];
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
-                                                {
-                                                    AddMessage("图片保存成功");
-                                                    stm = $"UPDATE avilinestate SET M3State = 2,M2State = 0,M2BoardID = NULL";
-                                                    result = mysql.executeQuery(stm);
-                                                    if (result > 0)
-                                                    {
-                                                        AddMessage("3号机放板");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    AddMessage("图片保存失败");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    string stm = $"SELECT * FROM avilinestate LIMIT 1";
+                                    DataSet ds = mysql.Select(stm);
+                                    DataTable dt = ds.Tables["table0"];
 
+                                    CurBoardID = (string)dt.Rows[0]["M2BoardID"];
+
+                                    stm = $"UPDATE avilinestate SET M3BoardID = '{CurBoardID}'";
+                                    result = mysql.executeQuery(stm);
+                                    if (result > 0)
+                                    {
+                                        AddMessage($"板编号 {CurBoardID}_{MachineID} 更新成功");
+                                    }
                                 }
+                                else
+                                {
+                                    AddMessage("数据库未连接");
+                                    StatusDataBase = false;
+                                }
+                                mysql.DisConnect();
                             }
-                            else
+
+
+
+                            if (H3u.ReadM("M2030"))
                             {
-                                AddMessage("数据库未连接");
-                                StatusDataBase = false;
+                                int d2030 = H3u.ReadW("D2030");
+                                AddMessage($"工位3-{d2030}-开始拍照");
+                                H3u.SetM("M2030", false);
+                                if (mycam.GrabImage(0, false))
+                                {
+                                    AddMessage("拍照成功");
+                                    CameraIamge = mycam.CurrentImage;
+                                    if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{CurBoardID}_{MachineID}_{d2030}.bmp")); }))
+                                    {
+                                        AddMessage("图片保存成功");
+                                        tcpNet.TCPSend($"{CurBoardID}_{MachineID}_{d2030}.bmp");
+                                    }
+                                    else
+                                    {
+                                        AddMessage("图片保存失败");
+                                    }
+                                }
+
                             }
-                            mysql.DisConnect();
                             #endregion
                             break;
                         case 4:
                             #region 4号机内容
-                            mysql = new Mysql();
-                            if (await Task.Run<bool>(() => { return mysql.Connect(); }))
+                            if (H3u.ReadM("M2041"))
                             {
-                                string stm = $"SELECT * FROM avilinestate LIMIT 1";
-                                DataSet ds = mysql.Select(stm);
-                                DataTable dt = ds.Tables["table0"];
-                                if ((int)dt.Rows[0]["M1State"] != -1)//0：等待拍照 1：拍照中 2：放板 -1：急停
+                                AddMessage("工位4-进板完成");
+                                H3u.SetM("M2041", false);
+                                mysql = new Mysql();
+                                if (await Task.Run<bool>(() => { return mysql.Connect(); }))
                                 {
-                                    if ((int)dt.Rows[0]["M3State"] == 2 && (int)dt.Rows[0]["M4State"] == 0)//1号机放板，2号机等待拍照
-                                    {
-                                        stm = $"UPDATE avilinestate SET M4State = 1,M4BoardID = M3BoardID";
-                                        result = mysql.executeQuery(stm);
-                                        if (result > 0)
-                                        {
-                                            AddMessage("4号机拍照");
-                                            if (mycam.GrabImage(0, false))
-                                            {
-                                                AddMessage("拍照成功");
-                                                CameraIamge = mycam.CurrentImage;
-                                                string boardID = (string)dt.Rows[0]["M3BoardID"];
-                                                if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{boardID}_{MachineID}.bmp")); }))
-                                                {
-                                                    AddMessage("图片保存成功");
-                                                    stm = $"UPDATE avilinestate SET M4State = 0,M3State = 0,M3BoardID = NULL";
-                                                    result = mysql.executeQuery(stm);
-                                                    if (result > 0)
-                                                    {
-                                                        AddMessage("4号机放板");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    AddMessage("图片保存失败");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    string stm = $"SELECT * FROM avilinestate LIMIT 1";
+                                    DataSet ds = mysql.Select(stm);
+                                    DataTable dt = ds.Tables["table0"];
 
+                                    CurBoardID = (string)dt.Rows[0]["M3BoardID"];
+
+                                    stm = $"UPDATE avilinestate SET M4BoardID = '{CurBoardID}'";
+                                    result = mysql.executeQuery(stm);
+                                    if (result > 0)
+                                    {
+                                        AddMessage($"板编号 {CurBoardID}_{MachineID} 更新成功");
+                                    }
                                 }
+                                else
+                                {
+                                    AddMessage("数据库未连接");
+                                    StatusDataBase = false;
+                                }
+                                mysql.DisConnect();
                             }
-                            else
+
+
+
+                            if (H3u.ReadM("M2040"))
                             {
-                                AddMessage("数据库未连接");
-                                StatusDataBase = false;
+                                int d2040 = H3u.ReadW("D2040");
+                                AddMessage($"工位4-{d2040}-开始拍照");
+                                H3u.SetM("M2040", false);
+                                if (mycam.GrabImage(0, false))
+                                {
+                                    AddMessage("拍照成功");
+                                    CameraIamge = mycam.CurrentImage;
+                                    if (await Task.Run<bool>(() => { return mycam.SaveImage("bmp", Path.Combine(RemotePath, $"{CurBoardID}_{MachineID}_{d2040}.bmp")); }))
+                                    {
+                                        AddMessage("图片保存成功");
+                                        tcpNet.TCPSend($"{CurBoardID}_{MachineID}_{d2040}.bmp");
+                                    }
+                                    else
+                                    {
+                                        AddMessage("图片保存失败");
+                                    }
+                                }
+
                             }
-                            mysql.DisConnect();
                             #endregion
                             break;
                         default:
                             break;
                     }
+
+
+                    StatusPLC = H3u.ConnectState;
                 }
                 catch (Exception ex)
                 {
                     AddMessage(ex.Message);
                 }
                 
-                await Task.Delay(200);
+                await Task.Delay(100);
             }
         }
         #endregion

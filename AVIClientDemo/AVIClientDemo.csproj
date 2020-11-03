@@ -63,6 +63,9 @@
     <Reference Include="ControlzEx, Version=4.0.0.0, Culture=neutral, PublicKeyToken=69f1c32f803d307e, processorArchitecture=MSIL">
       <HintPath>..\packages\ControlzEx.4.3.2\lib\net45\ControlzEx.dll</HintPath>
     </Reference>
+    <Reference Include="DXHLibrary">
+      <HintPath>..\DXHLibrary.dll</HintPath>
+    </Reference>
     <Reference Include="Google.Protobuf, Version=3.6.1.0, Culture=neutral, PublicKeyToken=a7d26565bac4d604, processorArchitecture=MSIL">
       <HintPath>..\packages\Google.Protobuf.3.6.1\lib\net45\Google.Protobuf.dll</HintPath>
     </Reference>
@@ -175,6 +178,8 @@
     <Compile Include="Global.cs" />
     <Compile Include="Model\CameraOperate.cs" />
     <Compile Include="Model\Inifile.cs" />
+    <Compile Include="Model\InovanceH3UModbusTCP.cs" />
+    <Compile Include="Model\IPLCCommunication.cs" />
     <Compile Include="Model\Metro.cs" />
     <Compile Include="Model\Mysql.cs" />
     <Compile Include="ViewModel\MainWindowViewModel.cs" />

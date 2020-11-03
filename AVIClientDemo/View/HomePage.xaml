@@ -35,12 +35,14 @@
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
                     </Grid.ColumnDefinitions>
-                    <ToggleButton Content="急停" Visibility="{Binding EStopToggleButtonVisibility}" IsChecked="{Binding EStopIsChecked}" Command="{Binding OperateButtonCommand}" FontSize="22" CommandParameter="0"
-                              Margin="10"
-                              Style="{DynamicResource MahApps.Styles.ToggleButton.Flat}">
-                    </ToggleButton>
                     <Button Grid.Column="1" Style="{StaticResource MahApps.Styles.Button.Square.Accent}" Content="功能" FontSize="22" Margin="10" Command="{Binding OperateButtonCommand}" CommandParameter="1"></Button>
                 </Grid>
+            </GroupBox>
+            <GroupBox Grid.Row="1" Header="数据面板">
+                <StackPanel Orientation="Vertical">
+                    <Label>当前板编号:</Label>
+                    <TextBlock Text="{Binding CurBoardID}"></TextBlock>
+                </StackPanel>
             </GroupBox>
         </Grid>
     </Grid>
