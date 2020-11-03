@@ -522,7 +522,7 @@ namespace AVIClientDemo.ViewModel
                                 for (int i = 0; i < 70; i++)
                                 {
                                     Random rd = new Random();
-                                    if (rd.Next(100) < 95)
+                                    if (rd.Next(100) < 80)
                                     {
                                         newBoard[i] = 1;
                                     }
@@ -581,8 +581,9 @@ namespace AVIClientDemo.ViewModel
                                     {
                                         AddMessage("图片保存失败");
                                     }
+                                    H3u.SetM("M2110", true);
                                 }
-
+                                
                             }
                             
                             #endregion
@@ -638,6 +639,7 @@ namespace AVIClientDemo.ViewModel
                                     {
                                         AddMessage("图片保存失败");
                                     }
+                                    H3u.SetM("M2120", true);
                                 }
 
                             }
@@ -693,6 +695,7 @@ namespace AVIClientDemo.ViewModel
                                     {
                                         AddMessage("图片保存失败");
                                     }
+                                    H3u.SetM("M2130", true);
                                 }
 
                             }
@@ -746,6 +749,7 @@ namespace AVIClientDemo.ViewModel
                                     {
                                         AddMessage("图片保存失败");
                                     }
+                                    H3u.SetM("M2140", true);
                                 }
 
                             }
