@@ -227,6 +227,28 @@ namespace AVIClientDemo.ViewModel
                 this.RaisePropertyChanged("StatusTCP");
             }
         }
+        private string localIP;
+
+        public string LocalIP
+        {
+            get { return localIP; }
+            set
+            {
+                localIP = value;
+                this.RaisePropertyChanged("LocalIP");
+            }
+        }
+        private int localPort;
+
+        public int LocalPort
+        {
+            get { return localPort; }
+            set
+            {
+                localPort = value;
+                this.RaisePropertyChanged("LocalPort");
+            }
+        }
 
         #endregion
         #region 方法绑定
@@ -249,7 +271,7 @@ namespace AVIClientDemo.ViewModel
             try
             {
                 MessageStr = "";
-                Version = "20201022";
+                Version = "20201103";
                 HomePageVisibility = "Visible";
                 ParameterPageVisibility = "Collapsed";
                 RemotePath = Inifile.INIGetStringValue(iniParameterPath, "System", "RemotePath", "D:\\");
@@ -268,7 +290,9 @@ namespace AVIClientDemo.ViewModel
 
                 RemoteIP = Inifile.INIGetStringValue(iniParameterPath, "Remote", "IP", "192.168.0.11");
                 RemotePort = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "Remote", "PORT", "3000"));
-                tcpNet = new DXH.Net.DXHTCPClient(RemoteIP,RemotePort);
+                LocalIP = Inifile.INIGetStringValue(iniParameterPath, "Local", "IP", "192.168.0.11");
+                LocalPort = int.Parse(Inifile.INIGetStringValue(iniParameterPath, "Local", "PORT", "5000"));
+                tcpNet = new DXH.Net.DXHTCPClient(RemoteIP, RemotePort, LocalIP, LocalPort);
                 tcpNet.ConnectStateChanged += TcpNet_ConnectStateChanged;
             }
             catch (Exception ex)
@@ -388,6 +412,8 @@ namespace AVIClientDemo.ViewModel
             Inifile.INIWriteValue(iniParameterPath, "System", "MachineID", MachineID);
             Inifile.INIWriteValue(iniParameterPath, "Remote", "IP", RemoteIP);
             Inifile.INIWriteValue(iniParameterPath, "Remote", "PORT", RemotePort.ToString());
+            Inifile.INIWriteValue(iniParameterPath, "Local", "IP", LocalIP);
+            Inifile.INIWriteValue(iniParameterPath, "Local", "PORT", LocalPort.ToString());
             AddMessage("保存参数");
         }
 
@@ -701,8 +727,6 @@ namespace AVIClientDemo.ViewModel
                                 }
                                 mysql.DisConnect();
                             }
-
-
 
                             if (H3u.ReadM("M2040"))
                             {
